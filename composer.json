@@ -1,12 +1,12 @@
 {
-    "name": "nunomaduro/skeleton-php",
-    "description": "A skeleton repository for my packages",
-    "keywords": ["php", "skeleton", "package"],
+    "name": "gflaminio3/telara",
+    "description": "A custom Laravel package that provides a storage disk for uploading files to Telegram and retrieving them seamlessly",
+    "keywords": ["php", "telegram", "storage"],
     "license": "MIT",
     "authors": [
         {
-            "name": "Nuno Maduro",
-            "email": "enunomaduro@gmail.com"
+            "name": "Giuseppe Flaminio",
+            "email": "gflaminio3@gmail.com"
         }
     ],
     "require": {
@@ -22,7 +22,7 @@
     },
     "autoload": {
         "psr-4": {
-            "NunoMaduro\\SkeletonPhp\\": "src/"
+            "Telara\\": "src/"
         }
     },
     "autoload-dev": {
