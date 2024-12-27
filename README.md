@@ -6,9 +6,9 @@ A custom Laravel package that provides a storage disk for uploading files to Tel
   <img src="https://raw.githubusercontent.com/gflaminio3/telara/master/docs/example.png" height="300" alt="Laravel Telegram Storage">
   <p align="center">
       <a href="https://github.com/gflaminio3/telara/actions"><img alt="GitHub Workflow Status (main)" src="https://github.com/gflaminio3/telara/actions/workflows/tests.yml/badge.svg"></a>
-      <a href="https://packagist.org/packages/your-namespace/telara"><img alt="Total Downloads" src="https://img.shields.io/packagist/dt/your-namespace/telara"></a>
-      <a href="https://packagist.org/packages/your-namespace/telara"><img alt="Latest Version" src="https://img.shields.io/packagist/v/your-namespace/telara"></a>
-      <a href="https://packagist.org/packages/your-namespace/telara"><img alt="License" src="https://img.shields.io/packagist/l/your-namespace/telara"></a>
+      <a href="https://packagist.org/packages/gflaminio3/telara"><img alt="Total Downloads" src="https://img.shields.io/packagist/dt/gflaminio3/telara"></a>
+      <a href="https://packagist.org/packages/gflaminio3/telara"><img alt="Latest Version" src="https://img.shields.io/packagist/v/gflaminio3/telara"></a>
+      <a href="https://packagist.org/packages/gflaminio3/telara"><img alt="License" src="https://img.shields.io/packagist/l/gflaminio3/telara"></a>
   </p>
 </p>
 
@@ -42,7 +42,7 @@ A custom Laravel package that provides a storage disk for uploading files to Tel
 You can install this package via Composer:
 
 ```bash
-composer require your-namespace/telara
+composer require gflaminio3/telara
 ```
 
 If you want to publish the config file to your own Laravel project's `config` directory, you can run:
