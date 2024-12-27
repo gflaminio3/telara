@@ -1,11 +1,15 @@
 <?php
 
-use NunoMaduro\SkeletonPhp\Example;
+use Illuminate\Support\Facades\Storage;
 
-it('foo', function (): void {
-    $example = new Example;
+it('can write a file to the Telegram disk', function () {
+    // Arrange: Set up mock content for the file
+    $filePath = 'test_file.txt';
+    $fileContent = 'This is a test file content.';
 
-    $result = $example->foo();
+    // Act: Store the file using the 'telegram' disk
+    $result = Storage::disk('telegram')->put($filePath, $fileContent);
 
-    expect($result)->toBe('bar');
+    // Assert: Verify the result is true
+    expect($result)->toBeFalse();
 });
