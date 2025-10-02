@@ -2,7 +2,7 @@
 
 namespace Telara\Tracking\Drivers;
 
-use Telara\Tracking\FileTracker;
+use Telara\Support\FileTracker;
 
 class NoneDriver extends FileTracker
 {

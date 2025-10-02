@@ -11,7 +11,8 @@ use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToWriteFile;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToCheckFileExistence;
-use Telara\Tracking\FileTracker;
+use Telara\Support\FileTracker;
+use Telara\Support\FileChunker;
 
 class TelegramFilesystemAdapter implements FilesystemAdapter
 {
@@ -19,6 +20,7 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
     protected string $chatId;
     protected array $config;
     protected ?FileTracker $tracker = null;
+    protected FileChunker $chunker;
 
     public function __construct(string $botToken, string $chatId, array $config = [])
     {
@@ -26,15 +28,27 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
         $this->chatId = $chatId;
         $this->config = array_merge(config('telara', []), $config);
 
-        // Inizializza il tracker se abilitato
         if ($this->config['track_files'] ?? false) {
             $this->tracker = FileTracker::make($this->config['tracking_driver'] ?? 'array');
         }
+
+        $chunkSize = $this->config['chunking']['size'] ?? 19 * 1024 * 1024;
+        $encryptionEnabled = $this->config['encryption']['enabled'] ?? false;
+        $encryptionKey = $this->config['encryption']['key'] ?? config('app.key');
+
+        Log::info('Telara: Initializing FileChunker', [
+            'chunk_size' => $chunkSize,
+            'encryption_enabled' => $encryptionEnabled,
+            'encryption_key_set' => !empty($encryptionKey),
+        ]);
+
+        $this->chunker = new FileChunker(
+            $chunkSize,
+            $encryptionEnabled,
+            $encryptionKey
+        );
     }
 
-    /**
-     * Verifica se un file esiste
-     */
     public function fileExists(string $path): bool
     {
         try {
@@ -48,127 +62,261 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
         }
     }
 
-    /**
-     * Verifica se una directory esiste (Telegram non ha directory)
-     */
     public function directoryExists(string $path): bool
     {
         return false;
     }
 
-    /**
-     * Scrive un file su Telegram
-     */
     public function write(string $path, string $contents, Config $config): void
     {
         try {
-            \Log::info('Telara: Attempting to write file', [
+            $chunkingEnabled = $this->config['chunking']['enabled'] ?? true;
+            $needsChunking = $chunkingEnabled && $this->chunker->needsChunking($contents);
+
+            if ($needsChunking) {
+                $this->writeChunked($path, $contents, $config);
+            } else {
+                $this->writeSingle($path, $contents, $config);
+            }
+        } catch (\Exception $e) {
+            $this->log('error', 'write', [
                 'path' => $path,
-                'size' => strlen($contents),
-                'bot_token_set' => !empty($this->botToken),
-                'chat_id' => $this->chatId,
+                'error' => $e->getMessage(),
             ]);
+            throw UnableToWriteFile::atLocation($path, $e->getMessage(), $e);
+        }
+    }
+
+    protected function writeSingle(string $path, string $contents, Config $config): void
+    {
+        $originalSize = strlen($contents);
+
+        $this->log('info', 'write_attempt', [
+            'path' => $path,
+            'size' => $originalSize,
+            'chunked' => false,
+            'encrypted' => $this->chunker->isEncryptionEnabled(),
+        ]);
+
+        if ($this->chunker->isEncryptionEnabled()) {
+            $contents = $this->chunker->encrypt($contents);
+        }
+
+        $response = Http::withoutVerifying()->attach(
+            'document',
+            $contents,
+            basename($path)
+        )->post($this->getApiUrl('sendDocument'), [
+                    'chat_id' => $this->chatId,
+                    'caption' => $config->get('caption', basename($path)),
+                ]);
+
+        $this->log('info', 'telegram_response', [
+            'status' => $response->status(),
+        ]);
+
+        if (!$response->successful()) {
+            throw new \Exception('Failed to upload file to Telegram: ' . $response->body());
+        }
+
+        $result = $response->json('result');
+        $fileId = $result['document']['file_id'] ?? null;
+
+        if (!$fileId) {
+            throw new \Exception('No file_id returned from Telegram');
+        }
+
+        if ($this->tracker) {
+            $this->tracker->track($path, $fileId, [
+                'size' => $originalSize,
+                'mime_type' => $result['document']['mime_type'] ?? 'application/octet-stream',
+                'file_name' => $result['document']['file_name'] ?? basename($path),
+                'caption' => $config->get('caption'),
+                'is_chunked' => false,
+                'is_encrypted' => $this->chunker->isEncryptionEnabled(),
+            ]);
+        }
+
+        $this->log('info', 'write', ['path' => $path, 'file_id' => $fileId, 'success' => true]);
+    }
+
+    protected function writeChunked(string $path, string $contents, Config $config): void
+    {
+        $this->log('info', 'write_chunked_attempt', [
+            'path' => $path,
+            'size' => strlen($contents),
+            'chunked' => true,
+        ]);
+
+        $chunks = $this->chunker->split($contents);
+        $chunkFileIds = [];
+
+        foreach ($chunks as $index => $chunk) {
+            $chunkPath = "{$path}.chunk{$index}";
 
             $response = Http::withoutVerifying()->attach(
                 'document',
-                $contents,
-                basename($path)
+                $chunk,
+                basename($chunkPath)
             )->post($this->getApiUrl('sendDocument'), [
                         'chat_id' => $this->chatId,
-                        'caption' => $config->get('caption', basename($path)),
+                        'caption' => "Chunk {$index} of " . basename($path),
                     ]);
 
-            \Log::info('Telara: Telegram API response', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-
             if (!$response->successful()) {
-                throw new \Exception('Failed to upload file to Telegram: ' . $response->body());
+                throw new \Exception("Failed to upload chunk {$index}: " . $response->body());
             }
 
             $result = $response->json('result');
             $fileId = $result['document']['file_id'] ?? null;
 
             if (!$fileId) {
-                throw new \Exception('No file_id returned from Telegram');
+                throw new \Exception("No file_id returned for chunk {$index}");
             }
 
-            // Traccia il file se il tracker è abilitato
-            if ($this->tracker) {
-                $this->tracker->track($path, $fileId, [
-                    'size' => strlen($contents),
-                    'mime_type' => $result['document']['mime_type'] ?? 'application/octet-stream',
-                    'file_name' => $result['document']['file_name'] ?? basename($path),
-                    'caption' => $config->get('caption'),
-                ]);
-            }
+            $chunkFileIds[] = $fileId;
 
-            $this->log('info', 'write', ['path' => $path, 'file_id' => $fileId, 'success' => true]);
-        } catch (\Exception $e) {
-            \Log::error('Telara: Write failed', [
+            $this->log('info', 'chunk_uploaded', [
                 'path' => $path,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'chunk' => $index,
+                'file_id' => $fileId,
             ]);
-            $this->log('error', 'write', ['path' => $path, 'error' => $e->getMessage()]);
-            throw UnableToWriteFile::atLocation($path, $e->getMessage(), $e);
         }
+
+        if ($this->tracker) {
+            $metadata = $this->chunker->generateChunkMetadata($chunkFileIds, $path, [
+                'original_size' => strlen($contents),
+                'mime_type' => 'application/octet-stream',
+                'file_name' => basename($path),
+                'caption' => $config->get('caption'),
+            ]);
+
+            $this->tracker->track($path, $chunkFileIds[0], array_merge($metadata, [
+                'is_encrypted' => $this->chunker->isEncryptionEnabled(),
+            ]));
+        }
+
+        $this->log('info', 'write_chunked', [
+            'path' => $path,
+            'chunks' => count($chunkFileIds),
+            'success' => true,
+        ]);
     }
 
-    /**
-     * Scrive uno stream su Telegram
-     */
     public function writeStream(string $path, $contents, Config $config): void
     {
         $stringContents = stream_get_contents($contents);
         $this->write($path, $stringContents, $config);
     }
 
-    /**
-     * Legge un file da Telegram
-     */
     public function read(string $path): string
     {
         try {
-            // Il path qui è il file_id di Telegram
-            $fileId = $this->resolveFileId($path);
+            $metadata = $this->tracker ? $this->tracker->getMetadata($path) : null;
 
-            // Ottieni il file path dal file_id
-            $response = Http::withoutVerifying()->get($this->getApiUrl('getFile'), [
-                'file_id' => $fileId,
-            ]);
-
-            if (!$response->successful()) {
-                throw new \Exception('Failed to get file info from Telegram: ' . $response->body());
+            if ($metadata && $this->chunker->isChunkedMetadata($metadata)) {
+                return $this->readChunked($path, $metadata);
             }
 
-            $filePath = $response->json('result.file_path');
-
-            if (!$filePath) {
-                throw new \Exception('No file_path returned from Telegram');
-            }
-
-            // Scarica il file
-            $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$filePath}";
-            $fileResponse = Http::withoutVerifying()->get($fileUrl);
-
-            if (!$fileResponse->successful()) {
-                throw new \Exception('Failed to download file from Telegram');
-            }
-
-            $this->log('info', 'read', ['path' => $path, 'file_id' => $fileId, 'success' => true]);
-
-            return $fileResponse->body();
+            return $this->readSingle($path);
         } catch (\Exception $e) {
             $this->log('error', 'read', ['path' => $path, 'error' => $e->getMessage()]);
             throw UnableToReadFile::fromLocation($path, $e->getMessage(), $e);
         }
     }
 
-    /**
-     * Legge un file come stream
-     */
+    protected function readSingle(string $path): string
+    {
+        $fileId = $this->resolveFileId($path);
+
+        $response = Http::withoutVerifying()->get($this->getApiUrl('getFile'), [
+            'file_id' => $fileId,
+        ]);
+
+        if (!$response->successful()) {
+            throw new \Exception('Failed to get file info from Telegram: ' . $response->body());
+        }
+
+        $filePath = $response->json('result.file_path');
+
+        if (!$filePath) {
+            throw new \Exception('No file_path returned from Telegram');
+        }
+
+        $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$filePath}";
+        $fileResponse = Http::withoutVerifying()->get($fileUrl);
+
+        if (!$fileResponse->successful()) {
+            throw new \Exception('Failed to download file from Telegram');
+        }
+
+        $contents = $fileResponse->body();
+
+        if ($this->chunker->isEncryptionEnabled()) {
+            $contents = $this->chunker->decrypt($contents);
+        }
+
+        $this->log('info', 'read', [
+            'path' => $path,
+            'file_id' => $fileId,
+            'encrypted' => $this->chunker->isEncryptionEnabled(),
+            'success' => true,
+        ]);
+
+        return $contents;
+    }
+
+    protected function readChunked(string $path, array $metadata): string
+    {
+        $this->log('info', 'read_chunked_attempt', [
+            'path' => $path,
+            'chunks' => $metadata['chunk_count'] ?? 0,
+        ]);
+
+        $chunkFileIds = $metadata['chunk_file_ids'] ?? [];
+        $chunks = [];
+
+        foreach ($chunkFileIds as $index => $fileId) {
+            $response = Http::withoutVerifying()->get($this->getApiUrl('getFile'), [
+                'file_id' => $fileId,
+            ]);
+
+            if (!$response->successful()) {
+                throw new \Exception("Failed to get info for chunk {$index}: " . $response->body());
+            }
+
+            $filePath = $response->json('result.file_path');
+
+            if (!$filePath) {
+                throw new \Exception("No file_path returned for chunk {$index}");
+            }
+
+            $fileUrl = "https://api.telegram.org/file/bot{$this->botToken}/{$filePath}";
+            $fileResponse = Http::withoutVerifying()->get($fileUrl);
+
+            if (!$fileResponse->successful()) {
+                throw new \Exception("Failed to download chunk {$index}");
+            }
+
+            $chunks[] = $fileResponse->body();
+
+            $this->log('info', 'chunk_downloaded', [
+                'path' => $path,
+                'chunk' => $index,
+            ]);
+        }
+
+        $merged = $this->chunker->merge($chunks);
+
+        $this->log('info', 'read_chunked', [
+            'path' => $path,
+            'chunks' => count($chunks),
+            'success' => true,
+        ]);
+
+        return $merged;
+    }
+
     public function readStream(string $path)
     {
         $contents = $this->read($path);
@@ -178,9 +326,6 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
         return $stream;
     }
 
-    /**
-     * Elimina un file (rimuove solo dal tracker, Telegram non supporta eliminazione)
-     */
     public function delete(string $path): void
     {
         try {
@@ -194,41 +339,26 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
         }
     }
 
-    /**
-     * Elimina una directory (non supportato)
-     */
     public function deleteDirectory(string $path): void
     {
-        // Telegram non ha directory
+        // Not supported
     }
 
-    /**
-     * Crea una directory (non supportato)
-     */
     public function createDirectory(string $path, Config $config): void
     {
-        // Telegram non ha directory
+        // Not supported
     }
 
-    /**
-     * Imposta la visibilità (non supportato)
-     */
     public function setVisibility(string $path, string $visibility): void
     {
-        // Telegram non supporta visibilità
+        // Not supported
     }
 
-    /**
-     * Ottiene la visibilità (sempre public)
-     */
     public function visibility(string $path): FileAttributes
     {
         return new FileAttributes($path, null, 'public');
     }
 
-    /**
-     * Ottiene il MIME type
-     */
     public function mimeType(string $path): FileAttributes
     {
         if ($this->tracker) {
@@ -240,9 +370,6 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
         return new FileAttributes($path, null, null, null, 'application/octet-stream');
     }
 
-    /**
-     * Ottiene l'ultimo timestamp di modifica
-     */
     public function lastModified(string $path): FileAttributes
     {
         if ($this->tracker) {
@@ -254,9 +381,6 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
         return new FileAttributes($path, null, null, time());
     }
 
-    /**
-     * Ottiene la dimensione del file
-     */
     public function fileSize(string $path): FileAttributes
     {
         if ($this->tracker) {
@@ -268,9 +392,6 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
         return new FileAttributes($path);
     }
 
-    /**
-     * Lista il contenuto (solo file tracciati)
-     */
     public function listContents(string $path, bool $deep): iterable
     {
         if ($this->tracker) {
@@ -288,35 +409,24 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
         }
     }
 
-    /**
-     * Sposta un file (non supportato direttamente)
-     */
     public function move(string $source, string $destination, Config $config): void
     {
         $this->copy($source, $destination, $config);
         $this->delete($source);
     }
 
-    /**
-     * Copia un file
-     */
     public function copy(string $source, string $destination, Config $config): void
     {
         $contents = $this->read($source);
         $this->write($destination, $contents, $config);
     }
 
-    /**
-     * Risolve il file_id da un path
-     */
     protected function resolveFileId(string $path): string
     {
-        // Se il path sembra già un file_id di Telegram, usalo direttamente
         if (strpos($path, '/') === false && strlen($path) > 20) {
             return $path;
         }
 
-        // Altrimenti cerca nel tracker
         if ($this->tracker) {
             $metadata = $this->tracker->getMetadata($path);
             return $metadata['file_id'] ?? $path;
@@ -325,17 +435,11 @@ class TelegramFilesystemAdapter implements FilesystemAdapter
         return $path;
     }
 
-    /**
-     * Ottiene l'URL dell'API di Telegram
-     */
     protected function getApiUrl(string $method): string
     {
         return "https://api.telegram.org/bot{$this->botToken}/{$method}";
     }
 
-    /**
-     * Log delle operazioni
-     */
     protected function log(string $level, string $action, array $context = []): void
     {
         if ($this->config['logging']['enabled'] ?? false) {

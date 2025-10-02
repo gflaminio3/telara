@@ -1,6 +1,6 @@
 <?php
 
-namespace Telara\Tracking;
+namespace Telara\Support;
 
 use Telara\Tracking\Drivers\ArrayDriver;
 use Telara\Tracking\Drivers\DatabaseDriver;

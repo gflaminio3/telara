@@ -27,7 +27,6 @@ return [
     | Tracking Driver
     |--------------------------------------------------------------------------
     | Supported: "none", "array", "database", "json"
-    |--------------------------------------------------------------------------
     */
     'tracking_driver' => env('TELARA_TRACKING_DRIVER', 'json'),
 
@@ -46,5 +45,25 @@ return [
     'logging' => [
         'enabled' => env('TELARA_LOGGING_ENABLED', false),
         'channel' => env('TELARA_LOGGING_CHANNEL', 'single'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Chunking
+    |--------------------------------------------------------------------------
+    */
+    'chunking' => [
+        'enabled' => env('TELARA_CHUNKING_ENABLED', true),
+        'size' => env('TELARA_CHUNK_SIZE', 19 * 1024 * 1024), // 19 MB
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Encryption
+    |--------------------------------------------------------------------------
+    */
+    'encryption' => [
+        'enabled' => env('TELARA_ENCRYPTION_ENABLED', false),
+        'key' => env('TELARA_ENCRYPTION_KEY', env('APP_KEY')),
     ],
 ];

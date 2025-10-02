@@ -27,8 +27,8 @@ class TelaraServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $configPath = __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'telara.php';
-        $migrationsPath = __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';
+        $configPath = __DIR__ . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'telara.php';
+        $migrationsPath = __DIR__ . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'migrations';
 
         // Pubblica il file di configurazione
         if ($this->app->runningInConsole()) {

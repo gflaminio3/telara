@@ -3,7 +3,7 @@
 namespace Telara\Tracking\Drivers;
 
 use Illuminate\Support\Facades\DB;
-use Telara\Tracking\FileTracker;
+use Telara\Support\FileTracker;
 
 class DatabaseDriver extends FileTracker
 {
@@ -11,20 +11,16 @@ class DatabaseDriver extends FileTracker
 
     public function track(string $path, string $fileId, array $metadata = []): void
     {
-        $data = [
+        $data = array_merge($metadata, [
             'file_id' => $fileId,
             'path' => $path,
-            'file_name' => $metadata['file_name'] ?? null,
-            'mime_type' => $metadata['mime_type'] ?? null,
-            'size' => $metadata['size'] ?? null,
-            'caption' => $metadata['caption'] ?? null,
             'metadata' => json_encode($metadata),
             'updated_at' => now(),
-        ];
+        ]);
 
         DB::table($this->table)->updateOrInsert(
             ['path' => $path],
-            array_merge($data, ['created_at' => DB::raw('COALESCE(created_at, NOW())')])
+            array_merge($data, ['created_at' => now()])
         );
     }
 
@@ -45,15 +41,15 @@ class DatabaseDriver extends FileTracker
             return null;
         }
 
-        $metadata = json_decode($record->metadata ?? '{}', true) ?? [];
+        $metadata = json_decode($record->metadata ?? '{}', true);
 
         return array_merge($metadata, [
             'file_id' => $record->file_id,
             'path' => $record->path,
-            'size' => $record->size,
-            'mime_type' => $record->mime_type,
-            'file_name' => $record->file_name,
-            'caption' => $record->caption,
+            'size' => $record->size ?? null,
+            'mime_type' => $record->mime_type ?? null,
+            'file_name' => $record->file_name ?? null,
+            'caption' => $record->caption ?? null,
             'created_at' => $record->created_at ? strtotime($record->created_at) : null,
             'updated_at' => $record->updated_at ? strtotime($record->updated_at) : null,
         ]);
@@ -71,19 +67,19 @@ class DatabaseDriver extends FileTracker
         $query = DB::table($this->table);
 
         if (!empty($prefix)) {
-            $query->where('path', 'like', $prefix . '%');
+            $query->where('path', 'like', "$prefix%");
         }
 
         return $query->get()->map(function ($record) {
-            $metadata = json_decode($record->metadata ?? '{}', true) ?? [];
+            $metadata = json_decode($record->metadata ?? '{}', true);
 
             return array_merge($metadata, [
                 'file_id' => $record->file_id,
                 'path' => $record->path,
-                'size' => $record->size,
-                'mime_type' => $record->mime_type,
-                'file_name' => $record->file_name,
-                'caption' => $record->caption,
+                'size' => $record->size ?? null,
+                'mime_type' => $record->mime_type ?? null,
+                'file_name' => $record->file_name ?? null,
+                'caption' => $record->caption ?? null,
                 'created_at' => $record->created_at ? strtotime($record->created_at) : null,
                 'updated_at' => $record->updated_at ? strtotime($record->updated_at) : null,
             ]);
