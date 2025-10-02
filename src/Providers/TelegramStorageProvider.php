@@ -13,7 +13,7 @@ use Telara\Models\Telara;
  * It now supports various file tracking drivers (array, database, JSON, none) and optional logging
  * as defined in the "telara.php" config file.
  */
-class TelegramStorageDriver implements FilesystemAdapter
+class TelegramStorageProvider implements FilesystemAdapter
 {
     /**
      * Base URL for Telegram's bot API.
@@ -50,9 +50,9 @@ class TelegramStorageDriver implements FilesystemAdapter
             $contents,
             basename($path)
         )->post("{$this->apiUrl}/sendDocument", [
-            'chat_id' => $this->chatId,
-            'caption' => $config['caption'] ?? null,
-        ]);
+                    'chat_id' => $this->chatId,
+                    'caption' => $config['caption'] ?? null,
+                ]);
 
         $success = $response->successful();
         $this->logAction('write', [
@@ -113,7 +113,7 @@ class TelegramStorageDriver implements FilesystemAdapter
         $trackEnabled = Config::get('telara.track_files', false);
         $trackingDriver = Config::get('telara.tracking_driver', 'none');
 
-        if (! $trackEnabled || $trackingDriver === 'none') {
+        if (!$trackEnabled || $trackingDriver === 'none') {
             $this->logAction('listContents', ['message' => 'Tracking disabled.']);
 
             return [];
@@ -122,7 +122,7 @@ class TelegramStorageDriver implements FilesystemAdapter
         if ($trackingDriver === 'array') {
             $this->logAction('listContents', ['message' => 'Returning in-memory array list.']);
 
-            return array_map(fn ($fp) => ['type' => 'file', 'path' => $fp], $this->trackedFiles);
+            return array_map(fn($fp) => ['type' => 'file', 'path' => $fp], $this->trackedFiles);
         }
 
         if ($trackingDriver === 'database') {
@@ -149,7 +149,7 @@ class TelegramStorageDriver implements FilesystemAdapter
         $trackEnabled = Config::get('telara.track_files', false);
         $trackingDriver = Config::get('telara.tracking_driver', 'none');
 
-        if (! $trackEnabled || $trackingDriver === 'none') {
+        if (!$trackEnabled || $trackingDriver === 'none') {
             $this->logAction('delete', [
                 'path' => $path,
                 'message' => 'Tracking disabled; cannot remove file from local record.',
@@ -186,7 +186,7 @@ class TelegramStorageDriver implements FilesystemAdapter
         $trackEnabled = Config::get('telara.track_files', false);
         $trackingDriver = Config::get('telara.tracking_driver', 'none');
 
-        if (! $trackEnabled || $trackingDriver === 'none') {
+        if (!$trackEnabled || $trackingDriver === 'none') {
             return false;
         }
 
@@ -296,13 +296,13 @@ class TelegramStorageDriver implements FilesystemAdapter
         $trackEnabled = Config::get('telara.track_files', false);
         $trackingDriver = Config::get('telara.tracking_driver', 'none');
 
-        if (! $trackEnabled || $trackingDriver === 'none') {
+        if (!$trackEnabled || $trackingDriver === 'none') {
             return;
         }
 
         if ($trackingDriver === 'array') {
             // For array, we only store the path in memory.
-            if (! in_array($path, $this->trackedFiles, true)) {
+            if (!in_array($path, $this->trackedFiles, true)) {
                 $this->trackedFiles[] = $path;
             }
         } elseif ($trackingDriver === 'database') {
@@ -351,12 +351,12 @@ class TelegramStorageDriver implements FilesystemAdapter
     {
         // The JSON file path is taken from config, even if not published.
         $jsonFilePath = Config::get('telara.json_tracking_path', storage_path('app/telara_files.json'));
-        if (! file_exists($jsonFilePath)) {
+        if (!file_exists($jsonFilePath)) {
             return [];
         }
 
         $data = json_decode(file_get_contents($jsonFilePath), true);
-        if (! is_array($data)) {
+        if (!is_array($data)) {
             return [];
         }
 
@@ -393,12 +393,12 @@ class TelegramStorageDriver implements FilesystemAdapter
     private function removeFromJson(string $path): bool
     {
         $jsonFilePath = Config::get('telara.json_tracking_path', storage_path('app/telara_files.json'));
-        if (! file_exists($jsonFilePath)) {
+        if (!file_exists($jsonFilePath)) {
             return false;
         }
 
         $data = json_decode(file_get_contents($jsonFilePath), true);
-        if (! is_array($data)) {
+        if (!is_array($data)) {
             return false;
         }
 
@@ -432,12 +432,12 @@ class TelegramStorageDriver implements FilesystemAdapter
     private function hasInJson(string $path): bool
     {
         $jsonFilePath = Config::get('telara.json_tracking_path', storage_path('app/telara_files.json'));
-        if (! file_exists($jsonFilePath)) {
+        if (!file_exists($jsonFilePath)) {
             return false;
         }
 
         $data = json_decode(file_get_contents($jsonFilePath), true);
-        if (! is_array($data)) {
+        if (!is_array($data)) {
             return false;
         }
 

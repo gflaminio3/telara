@@ -1,7 +1,12 @@
 {
     "name": "gflaminio3/telara",
     "description": "A custom Laravel package that provides a storage disk for uploading files to Telegram and retrieving them seamlessly",
-    "keywords": ["php", "telegram", "storage"],
+    "keywords": [
+        "php",
+        "telegram",
+        "storage",
+        "laravel"
+    ],
     "license": "MIT",
     "authors": [
         {
@@ -10,15 +15,29 @@
         }
     ],
     "require": {
-        "php": "^8.3.0"
+        "php": "^8.3.0",
+        "illuminate/support": "^11.0|^12.0",
+        "illuminate/filesystem": "^11.0|^12.0",
+        "illuminate/http": "^11.0|^12.0",
+        "illuminate/database": "^11.0|^12.0",
+        "league/flysystem": "^3.0"
     },
     "require-dev": {
         "laravel/pint": "^1.18.1",
         "pestphp/pest": "^3.5.1",
+        "pestphp/pest-plugin-laravel": "^3.0",
         "pestphp/pest-plugin-type-coverage": "^3.1",
         "phpstan/phpstan": "^1.12.7",
         "rector/rector": "^1.2.8",
-        "symfony/var-dumper": "^7.1.6"
+        "symfony/var-dumper": "^7.1.6",
+        "orchestra/testbench": "^9.0|^10.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Telara\\TelaraServiceProvider"
+            ]
+        }
     },
     "autoload": {
         "psr-4": {
