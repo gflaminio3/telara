@@ -3,9 +3,8 @@
 A custom Laravel package that provides a storage disk for uploading files to Telegram and retrieving them seamlessly. It integrates effortlessly with Laravel's Filesystem to let you store files through Telegram's API just like you would use S3, local, or any other disk.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/gflaminio3/telara/master/docs/example.png" height="300" alt="Laravel Telegram Storage">
+  <img src="https://raw.githubusercontent.com/gflaminio3/telara/master/docs/banner.png" height="300" alt="Laravel Telegram Storage">
   <p align="center">
-      <a href="https://github.com/gflaminio3/telara/actions"><img alt="GitHub Workflow Status (main)" src="https://github.com/gflaminio3/telara/actions/workflows/tests.yml/badge.svg"></a>
       <a href="https://packagist.org/packages/gflaminio3/telara"><img alt="Total Downloads" src="https://img.shields.io/packagist/dt/gflaminio3/telara"></a>
       <a href="https://packagist.org/packages/gflaminio3/telara"><img alt="Latest Version" src="https://img.shields.io/packagist/v/gflaminio3/telara"></a>
       <a href="https://packagist.org/packages/gflaminio3/telara"><img alt="License" src="https://img.shields.io/packagist/l/gflaminio3/telara"></a>
@@ -16,18 +15,20 @@ A custom Laravel package that provides a storage disk for uploading files to Tel
 
 ## Table of Contents
 
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-  - [Basic Usage](#basic-usage)
-  - [File Tracking Options](#file-tracking-options)
-  - [Logging](#logging)
-- [Advanced Usage](#advanced-usage)
-  - [Database Tracking](#database-tracking)
-  - [JSON Tracking](#json-tracking)
-- [Testing](#testing)
-- [License](#license)
+- [Laravel Telegram Storage (Telara)](#laravel-telegram-storage-telara)
+  - [Table of Contents](#table-of-contents)
+  - [Requirements](#requirements)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+  - [Usage](#usage)
+    - [Basic Usage](#basic-usage)
+    - [File Tracking Options](#file-tracking-options)
+    - [Logging](#logging)
+  - [Advanced Usage](#advanced-usage)
+    - [Database Tracking](#database-tracking)
+    - [JSON Tracking](#json-tracking)
+  - [Testing](#testing)
+  - [License](#license)
 
 ---
 
